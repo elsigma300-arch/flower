@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Virtual Flower Experience</title>
+    <title>FLOWER BY RZ PROJECT</title>
     <link rel="stylesheet" href="style.css">
     
     <!-- MediaPipe Tasks Vision / Hands Engine -->
@@ -13,24 +13,40 @@
 </head>
 <body>
 
+    <!-- START SCREEN / LANDING PAGE -->
+    <div id="start-screen" class="start-screen">
+        <div class="landing-card">
+            <div class="heart-icon-header">💖</div>
+            <h1 class="glow-title">FLOWER BY RZ PROJECT</h1>
+            <p class="subtitle">Interactive Virtual Botanical Experience</p>
+            <button id="start-btn" class="glow-button">
+                <span>OPEN CAMERA</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN ARTROOM APP CONTAINER -->
     <div class="art-container">
-        <!-- Background Ambient Glassmorphism -->
+        <!-- Ambient Background Glow & Hearts -->
         <div class="ambient-glow"></div>
         <div class="vignette"></div>
 
-        <!-- Camera Container -->
-        <div class="camera-wrapper">
-            <video id="video" autoplay playsinline></video>
-            <canvas id="canvas"></canvas>
+        <!-- CAMERA WRAPPER WITH PINK GLOW FRAME -->
+        <div class="camera-frame-container">
+            <div class="pink-glow-border"></div>
+            <div class="camera-wrapper">
+                <video id="video" playsinline></video>
+                <canvas id="canvas"></canvas>
+            </div>
         </div>
 
-        <!-- Glassmorphism Overlay HUD Minimalis -->
+        <!-- Glassmorphism Status Bar -->
         <div class="hud-overlay">
             <div class="hud-status">
                 <span class="pulse-dot"></span>
-                <span>VIRTUAL BOTANICAL ART</span>
+                <span>FLOWER BY RZ PROJECT</span>
             </div>
-            <div id="fps-counter" class="fps-badge">FPS: 60</div>
+            <div id="fps-counter" class="fps-badge">FPS: --</div>
         </div>
     </div>
 

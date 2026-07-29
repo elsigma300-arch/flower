@@ -1,0 +1,124 @@
+/* Dark aesthetic styling and GPU accelerated container */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #0d1117;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #ffffff;
+}
+
+#app-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Mirrored Video Setup */
+#webcam {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    opacity: 0.15; /* Subtle webcam feed in background */
+    filter: grayscale(80%) contrast(120%);
+    z-index: 1;
+}
+
+/* SVG Flora Canvas */
+#flora-canvas {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    pointer-events: none;
+    will-change: transform;
+    transform: translate3d(0, 0, 0);
+}
+
+/* Vignette Overlay */
+.vignette {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.8);
+    pointer-events: none;
+    z-index: 3;
+}
+
+/* Glassmorphism UI */
+#ui-overlay {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 4;
+    pointer-events: none;
+}
+
+.status-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.status-card h2 {
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+    color: #FFB6D5;
+}
+
+.status-card p {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 4px 0;
+}
+
+#fps-counter {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    font-family: monospace;
+    color: #55a84b;
+}
+
+/* SVG Bloom & Petal Styles */
+.flora-stem {
+    fill: none;
+    stroke: url(#stem-grad);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.5));
+}
+
+.flower-group {
+    transform-origin: center;
+    will-change: transform, opacity;
+    transition: filter 0.3s ease;
+}
+
+.flower-group.bloomed {
+    filter: url(#bloom-glow);
+}
+
+.petal {
+    fill: url(#petal-grad);
+    stroke: #FFB6D5;
+    stroke-width: 0.5;
+}
+
+.flower-center {
+    fill: #FFF59D;
+}

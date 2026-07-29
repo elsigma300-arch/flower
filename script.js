@@ -1,6 +1,6 @@
 /**
  * FLOWER BY RZ PROJECT
- * Interactive Botanical Experience (6 Flowers + Love Particles + Precise Tracking)
+ * Interactive Botanical Experience (Fixed Auto-Fallback Camera & MediaPipe)
  */
 
 class MathUtils {
@@ -50,7 +50,6 @@ class HeartParticleSystem {
             ctx.globalAlpha = p.opacity;
             ctx.fillStyle = '#ff69b4';
 
-            // Menggambar Bentuk Lope-Lope (Heart Shape Path)
             ctx.beginPath();
             const topCurveHeight = p.size * 0.3;
             ctx.moveTo(0, topCurveHeight);
@@ -73,7 +72,7 @@ class Flower {
     constructor(x, y) {
         this.x = x;
         this.y = y;
-        this.petals = Math.floor(Math.random() * 2) + 5; // 5-6 Kelopak
+        this.petals = Math.floor(Math.random() * 2) + 5;
         this.scale = 0;
         this.targetScale = 0;
         this.rotation = Math.random() * Math.PI * 2;
@@ -86,7 +85,6 @@ class Flower {
     }
 
     update() {
-        // Elastic Spring Easing Animation
         const force = (this.targetScale - this.scale) * 0.12;
         this.scale += force;
     }
@@ -99,11 +97,9 @@ class Flower {
         ctx.scale(this.scale, this.scale);
         ctx.rotate(this.rotation);
 
-        // Glow Pink Bunga
         ctx.shadowBlur = 18;
         ctx.shadowColor = '#FF1493';
 
-        // Menggambar Kelopak Bunga (Path Vector)
         const angleStep = (Math.PI * 2) / this.petals;
         for (let i = 0; i < this.petals; i++) {
             ctx.save();
@@ -123,7 +119,6 @@ class Flower {
             ctx.restore();
         }
 
-        // Putik Tengah Bunga (Kuning pastel)
         ctx.shadowBlur = 0;
         ctx.fillStyle = '#FFF59D';
         ctx.beginPath();
@@ -148,7 +143,6 @@ class PlantStem {
         this.opacity = 0;
         this.targetOpacity = 0;
 
-        // INISIALISASI TEPAT 6 BUNGA
         this.flowers = Array.from({ length: 6 }, () => new Flower(0, 0));
     }
 
@@ -162,7 +156,6 @@ class PlantStem {
         this.baseX = MathUtils.lerp(this.baseX, targetX, 0.25);
         this.baseY = MathUtils.lerp(this.baseY, targetY, 0.25);
 
-        // Wind & Inertia Simulation
         const wind = Math.sin(performance.now() * 0.003) * 10;
         this.vx = MathUtils.lerp(this.vx, dx * 0.12 + wind, 0.08);
         this.vy = MathUtils.lerp(this.vy, dy * 0.12, 0.08);
@@ -170,31 +163,24 @@ class PlantStem {
         this.tipX = this.baseX - this.vx;
         this.tipY = this.baseY - 160 - this.vy;
 
-        // POSISI TEPAT KETENAM (6) BUNGA PADA CABANG ORGANIK
         const ctrlX = (this.baseX + this.tipX) / 2;
         const ctrlY = (this.baseY + this.tipY) / 2;
 
-        // 1. Bunga Puncak Utama
         this.flowers[0].x = this.tipX;
         this.flowers[0].y = this.tipY;
 
-        // 2. Bunga Cabang Kiri Atas
         this.flowers[1].x = this.tipX - 45;
         this.flowers[1].y = this.tipY + 35;
 
-        // 3. Bunga Cabang Kanan Atas
         this.flowers[2].x = this.tipX + 50;
         this.flowers[2].y = this.tipY + 45;
 
-        // 4. Bunga Cabang Kiri Tengah
         this.flowers[3].x = ctrlX - 55;
         this.flowers[3].y = ctrlY;
 
-        // 5. Bunga Cabang Kanan Tengah
         this.flowers[4].x = ctrlX + 55;
         this.flowers[4].y = ctrlY + 15;
 
-        // 6. Bunga Cabang Bawah
         this.flowers[5].x = this.baseX - 35;
         this.flowers[5].y = this.baseY - 50;
 
@@ -203,7 +189,6 @@ class PlantStem {
 
     toggleBloom(state) {
         this.flowers.forEach((f, index) => {
-            // Mekar sedikit bergantian (staggered delay effect)
             setTimeout(() => f.setBloom(state), index * 60);
         });
     }
@@ -214,7 +199,6 @@ class PlantStem {
         ctx.save();
         ctx.globalAlpha = this.opacity;
 
-        // Batang Utama Organic Green
         ctx.strokeStyle = '#437a47';
         ctx.lineWidth = 6;
         ctx.lineCap = 'round';
@@ -227,7 +211,6 @@ class PlantStem {
         ctx.quadraticCurveTo(ctrlX, ctrlY, this.tipX, this.tipY);
         ctx.stroke();
 
-        // 5 Cabang Menyamping ke Masing-Masing Bunga
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.moveTo(this.tipX, this.tipY); ctx.lineTo(this.flowers[1].x, this.flowers[1].y);
@@ -237,7 +220,6 @@ class PlantStem {
         ctx.moveTo(this.baseX, this.baseY - 30); ctx.lineTo(this.flowers[5].x, this.flowers[5].y);
         ctx.stroke();
 
-        // Render 6 Bunga
         this.flowers.forEach(f => f.draw(ctx));
 
         ctx.restore();
@@ -309,12 +291,21 @@ class App {
     }
 
     async init() {
-        this.initMediaPipe();
-        await this.initWebcam();
-        requestAnimationFrame((t) => this.renderLoop(t));
+        try {
+            this.initMediaPipe();
+            await this.initWebcam();
+            requestAnimationFrame((t) => this.renderLoop(t));
+        } catch (e) {
+            console.error("Initialization Error:", e);
+        }
     }
 
     initMediaPipe() {
+        if (typeof Hands === 'undefined') {
+            alert("MediaPipe library belum terunduh. Pastikan terkoneksi ke Internet!");
+            return;
+        }
+
         this.hands = new Hands({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
         });
@@ -322,8 +313,8 @@ class App {
         this.hands.setOptions({
             maxNumHands: 2,
             modelComplexity: 1,
-            minDetectionConfidence: 0.65,
-            minTrackingConfidence: 0.65
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
         });
 
         this.hands.onResults((res) => this.onHandResults(res));
@@ -332,18 +323,24 @@ class App {
     async initWebcam() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { width: 1280, height: 720, frameRate: { ideal: 60 } },
+                video: { width: { ideal: 1280 }, height: { ideal: 720 } },
                 audio: false
             });
             this.video.srcObject = stream;
-            await this.video.play();
+            
+            await new Promise((resolve) => {
+                this.video.onloadedmetadata = () => {
+                    this.video.play();
+                    resolve();
+                };
+            });
 
-            // SINKRONISASI UKURAN KANVAS SAMA PERSIS DENGAN WEBCAM
             this.canvas.width = this.video.videoWidth || 1280;
             this.canvas.height = this.video.videoHeight || 720;
         } catch (err) {
             console.error("Gagal Akses Kamera:", err);
-            this.fpsCounter.innerText = "NO CAMERA ACCESS";
+            alert("Tidak dapat mengakses kamera. Pastikan izin kamera telah diberikan.");
+            this.fpsCounter.innerText = "NO CAMERA";
         }
     }
 
@@ -361,7 +358,6 @@ class App {
             });
         }
 
-        // --- GESTURE TANGAN KANAN (MUNCUL/HILANG TANAMAN) ---
         if (rightHand) {
             const palmCenter = {
                 x: (rightHand[0].x + rightHand[9].x) / 2 * this.canvas.width,
@@ -379,7 +375,6 @@ class App {
             this.plant.update(this.plant.baseX, this.plant.baseY, false);
         }
 
-        // --- GESTURE TANGAN KIRI (PINCH TOGGLE MEKAR 6 BUNGA) ---
         if (leftHand) {
             const isPinching = GestureDetector.isPinch(leftHand);
             if (isPinching && !this.lastPinchState) {
@@ -395,22 +390,17 @@ class App {
     }
 
     renderLoop(currentTime) {
-        // Asynchronous Loop Handler
-        if (this.video.readyState >= 2 && !this.isProcessingHand) {
+        if (this.video.readyState >= 2 && !this.isProcessingHand && this.hands) {
             this.isProcessingHand = true;
             this.hands.send({ image: this.video }).catch(() => { this.isProcessingHand = false; });
         }
 
-        // Clear Canvas Frame
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Draw Ambient Floating Heart Particles
         this.hearts.updateAndRender(this.ctx, this.canvas.width, this.canvas.height);
 
-        // Draw 6 Flowers Plant Stem
         this.plant.draw(this.ctx);
 
-        // FPS Tracker Engine
         this.frameCount++;
         if (currentTime - this.lastTime >= 1000) {
             this.fpsCounter.innerText = `FPS: ${this.frameCount}`;
@@ -422,7 +412,6 @@ class App {
     }
 }
 
-// Start Main App Instance
 window.addEventListener('DOMContentLoaded', () => {
     new App();
 });

@@ -3,156 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Flora Installation — Professional Digital Art</title>
+    <title>Interactive Virtual Flower Experience</title>
     <link rel="stylesheet" href="style.css">
+    
+    <!-- MediaPipe Tasks Vision / Hands Engine -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 </head>
 <body>
-    <!-- Background Canvas for Ambient Particles -->
-    <canvas id="bg-canvas"></canvas>
-    
-    <div id="app-container">
-        <!-- Live Mirror Camera Feed -->
-        <video id="webcam" autoplay playsinline muted></video>
 
-        <!-- Main Procedural SVG Interactive Layer -->
-        <svg id="flora-svg" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <!-- Stem Gradient -->
-                <linearGradient id="stem-grad" x1="0%" y1="100%" x2="0%" y2="0%">
-                    <stop offset="0%" stop-color="#1b4317" />
-                    <stop offset="50%" stop-color="#2d6a2f" />
-                    <stop offset="100%" stop-color="#52b788" />
-                </linearGradient>
+    <div class="art-container">
+        <!-- Background Ambient Glassmorphism -->
+        <div class="ambient-glow"></div>
+        <div class="vignette"></div>
 
-                <!-- Sakura Petal Gradient -->
-                <linearGradient id="petal-grad" x1="0%" y1="0%" x2="100%" x2="100%">
-                    <stop offset="0%" stop-color="#FFC0CB" />
-                    <stop offset="40%" stop-color="#FF9ECF" />
-                    <stop offset="80%" stop-color="#FFB6D5" />
-                    <stop offset="100%" stop-color="#F8A5C2" />
-                </linearGradient>
-
-                <!-- Flower Center Gradient -->
-                <radialGradient id="center-grad" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="#FFF59D" />
-                    <stop offset="70%" stop-color="#FBC02D" />
-                    <stop offset="100%" stop-color="#E65100" />
-                </radialGradient>
-
-                <!-- Soft Glow Bloom Filter -->
-                <filter id="bloom-glow" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-                    <feMerge>
-                        <feMergeNode in="coloredBlur"/>
-                        <feMergeNode in="SourceGraphic"/>
-                    </feMerge>
-                </filter>
-
-                <!-- Drop Shadow Filter -->
-                <filter id="drop-shadow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.6"/>
-                </filter>
-            </defs>
-            <g id="plant-root-group" filter="url(#drop-shadow)"></g>
-        </svg>
-
-        <!-- Ambient Vignette & Lighting -->
-        <div class="vignette-overlay"></div>
-    </div>
-
-    <!-- Adobe/Figma Style Creative App UI Header -->
-    <header id="app-header">
-        <div class="brand">
-            <div class="brand-icon"></div>
-            <span class="brand-title">FLORA STUDIO <small>v2.5 PRO</small></span>
-        </div>
-        <div class="header-actions">
-            <button id="btn-toggle-debug" class="btn-glass">Toggle Debug [D]</button>
-            <button id="btn-reinit-cam" class="btn-glass">Reset Camera</button>
-        </div>
-    </header>
-
-    <!-- Sidebar Control & Status Panel -->
-    <aside id="app-sidebar">
-        <div class="glass-card">
-            <h3>Gestures & Controls</h3>
-            <ul class="gesture-list">
-                <li>
-                    <span class="gesture-badge right">Right Hand</span>
-                    <strong>Open Palm:</strong> Grow Flora
-                </li>
-                <li>
-                    <span class="gesture-badge right">Right Hand</span>
-                    <strong>Closed Fist:</strong> Decay & Fade
-                </li>
-                <li>
-                    <span class="gesture-badge left">Left Hand</span>
-                    <strong>Pinch:</strong> Toggle Bloom
-                </li>
-            </ul>
+        <!-- Camera Container -->
+        <div class="camera-wrapper">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
         </div>
 
-        <div class="glass-card">
-            <h3>Live Telemetry</h3>
-            <div class="telemetry-grid">
-                <div class="tel-item">
-                    <span>Right Hand:</span>
-                    <strong id="tel-right-gesture">OFFLINE</strong>
-                </div>
-                <div class="tel-item">
-                    <span>Left Hand:</span>
-                    <strong id="tel-left-gesture">OFFLINE</strong>
-                </div>
-                <div class="tel-item">
-                    <span>Flora State:</span>
-                    <strong id="tel-flora-state">DORMANT</strong>
-                </div>
-                <div class="tel-item">
-                    <span>Bloom Mode:</span>
-                    <strong id="tel-bloom-mode">CLOSED</strong>
-                </div>
+        <!-- Glassmorphism Overlay HUD Minimalis -->
+        <div class="hud-overlay">
+            <div class="hud-status">
+                <span class="pulse-dot"></span>
+                <span>VIRTUAL BOTANICAL ART</span>
             </div>
-        </div>
-    </aside>
-
-    <!-- Bottom Status Bar -->
-    <footer id="app-statusbar">
-        <div class="status-item"><span class="indicator green"></span> System Ready</div>
-        <div class="status-item">Cam: <span id="stat-cam-res">1280x720</span></div>
-        <div class="status-item">FPS: <span id="stat-fps">00</span></div>
-        <div class="status-item">Latency: <span id="stat-latency">0ms</span></div>
-    </footer>
-
-    <!-- Interactive Professional Debug Panel Overlay -->
-    <div id="debug-panel" class="glass-card hidden">
-        <div class="debug-header">
-            <h4>ENGINE DIAGNOSTICS</h4>
-            <span class="close-debug">&times;</span>
-        </div>
-        <div class="debug-content">
-            <p>FPS: <span id="dbg-fps">0</span></p>
-            <p>Frame Time: <span id="dbg-frame-time">0 ms</span></p>
-            <p>Tracking Latency: <span id="dbg-latency">0 ms</span></p>
-            <p>Landmarks Tracked: <span id="dbg-landmarks">0</span></p>
-            <p>Right Hand Confidence: <span id="dbg-right-conf">0%</span></p>
-            <p>Left Hand Confidence: <span id="dbg-left-conf">0%</span></p>
-            <p>Palm Rotation: <span id="dbg-palm-rot">0 deg</span></p>
-            <p>Hand Scale: <span id="dbg-hand-scale">1.0</span></p>
-            <p>Hardware Accel: <span id="dbg-gpu">WebGL Enabled</span></p>
-            <p>Memory Usage: <span id="dbg-mem">N/A</span></p>
+            <div id="fps-counter" class="fps-badge">FPS: 60</div>
         </div>
     </div>
 
-    <!-- Modal Dialog Error System -->
-    <div id="error-dialog" class="modal-backdrop hidden">
-        <div class="modal-card glass-card">
-            <h3 id="error-title">Hardware Error</h3>
-            <p id="error-msg">Failed to initialize camera or MediaPipe resources.</p>
-            <button id="btn-error-retry" class="btn-primary">Retry Connection</button>
-        </div>
-    </div>
-
-    <!-- Import MediaPipe Tasks Vision Library -->
-    <script type="module" src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>

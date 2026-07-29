@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Flora Installation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Background & Camera Container -->
+    <div id="app-container">
+        <video id="webcam" autoplay playsinline muted></video>
+        <svg id="flora-canvas" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <!-- Stem Gradient -->
+                <linearGradient id="stem-grad" x1="0%" y1="100%" x2="0%" y2="0%">
+                    <stop offset="0%" stop-color="#2d5a27" />
+                    <stop offset="50%" stop-color="#3a7d34" />
+                    <stop offset="100%" stop-color="#55a84b" />
+                </linearGradient>
+
+                <!-- Flower Petal Gradient -->
+                <linearGradient id="petal-grad" x1="0%" y1="0%" x2="100%" x2="100%">
+                    <stop offset="0%" stop-color="#FFC0CB" />
+                    <stop offset="50%" stop-color="#FF9ECF" />
+                    <stop offset="100%" stop-color="#F8A5C2" />
+                </linearGradient>
+
+                <!-- Soft Glow Filter -->
+                <filter id="bloom-glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                    <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+            </defs>
+            <g id="flora-group"></g>
+        </svg>
+        <div class="vignette"></div>
+    </div>
+
+    <!-- Glassmorphic UI Overlay -->
+    <div id="ui-overlay">
+        <div class="status-card">
+            <h2>Flora Installation</h2>
+            <p><strong>Right Hand Open:</strong> Grow Stem</p>
+            <p><strong>Right Hand Fist:</strong> Fade Stem</p>
+            <p><strong>Left Hand Pinch:</strong> Toggle Bloom</p>
+            <div id="fps-counter">FPS: --</div>
+        </div>
+    </div>
+
+    <!-- MediaPipe Tasks Vision CDN -->
+    <script type="module" src="script.js"></script>
+</body>
+</html>

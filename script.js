@@ -1,690 +1,454 @@
-import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
-
 /**
- * MATH & SMOOTHING UTILITIES
+ * INTERACTIVE VIRTUAL FLOWER EXPERIENCE
+ * Modular Architecture: HandTracker, GestureDetector, PhysicsEngine, Stem, Flower, SceneRenderer
  */
-class Vector2 {
-    constructor(x = 0, y = 0) {
-        this.x = x;
-        this.y = y;
+
+// ==========================================
+// 1. PHYSICS & UTILS ENGINE
+// ==========================================
+class MathUtils {
+    static lerp(start, end, amt) {
+        return (1 - amt) * start + amt * end;
     }
 
-    set(x, y) {
-        this.x = x;
-        this.y = y;
-        return this;
-    }
-
-    lerp(target, alpha) {
-        this.x += (target.x - this.x) * alpha;
-        this.y += (target.y - this.y) * alpha;
-        return this;
-    }
-
-    distanceTo(v) {
-        const dx = this.x - v.x;
-        const dy = this.y - v.y;
-        return Math.sqrt(dx * dx + dy * dy);
+    static distance(p1, p2) {
+        return Math.hypot(p2.x - p1.x, p2.y - p1.y);
     }
 }
 
-class ExponentialFilter {
-    constructor(alpha = 0.35) {
-        this.alpha = alpha;
-        this.value = null;
+class ParticleSystem {
+    constructor(count = 40) {
+        this.particles = Array.from({ length: count }, () => ({
+            x: Math.random(),
+            y: Math.random(),
+            size: Math.random() * 2 + 1,
+            speedY: Math.random() * 0.0005 + 0.0002,
+            opacity: Math.random() * 0.5 + 0.2
+        }));
     }
 
-    filter(newValue) {
-        if (this.value === null) {
-            this.value = newValue;
-        } else {
-            this.value = this.value + this.alpha * (newValue - this.value);
+    updateAndRender(ctx, width, height) {
+        ctx.save();
+        this.particles.forEach(p => {
+            p.y -= p.speedY;
+            if (p.y < 0) p.y = 1;
+
+            ctx.fillStyle = `rgba(255, 192, 203, ${p.opacity})`;
+            ctx.beginPath();
+            ctx.arc(p.x * width, p.y * height, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.restore();
+    }
+}
+
+// ==========================================
+// 2. BOTANICAL PROCEDURAL ARTWORK (SVG/PATH)
+// ==========================================
+class Leaf {
+    constructor(offsetRatio, side) {
+        this.offsetRatio = offsetRatio; // Posisi sepanjang cabang (0 - 1)
+        this.side = side; // -1 (kiri) atau 1 (kanan)
+        this.size = Math.random() * 8 + 10;
+    }
+
+    draw(ctx, x, y, angle) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle + (this.side * Math.PI / 4));
+        
+        ctx.fillStyle = '#4e8752';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.size, this.size / 2.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+class Flower {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.petals = Math.floor(Math.random() * 3) + 5; // 5 - 7 Kelopak
+        this.scale = 0;
+        this.targetScale = 0;
+        this.bloomState = false; // Is bloomed toggle
+        this.rotation = Math.random() * Math.PI * 2;
+        
+        // Color Palette
+        this.colors = ['#FFC0CB', '#FF9ECF', '#FFB6D5', '#F8A5C2'];
+        this.baseColor = this.colors[Math.floor(Math.random() * this.colors.length)];
+    }
+
+    setBloom(state) {
+        this.bloomState = state;
+        this.targetScale = state ? 1 : 0;
+    }
+
+    update() {
+        // Spring physics Easing untuk mekar / menutup
+        const force = (this.targetScale - this.scale) * 0.1;
+        this.scale += force;
+    }
+
+    draw(ctx) {
+        if (this.scale <= 0.01) return;
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.scale(this.scale, this.scale);
+        ctx.rotate(this.rotation);
+
+        // Glow Effect
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#FF9ECF';
+
+        // Draw Petals (Kelopak SVG Gradient Visual)
+        const angleStep = (Math.PI * 2) / this.petals;
+        for (let i = 0; i < this.petals; i++) {
+            ctx.save();
+            ctx.rotate(i * angleStep);
+
+            const grad = ctx.createLinearGradient(0, 0, 0, -25);
+            grad.addColorStop(0, '#fff0f5');
+            grad.addColorStop(0.6, this.baseColor);
+            grad.addColorStop(1, '#e87ea1');
+
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.bezierCurveTo(-12, -15, -8, -30, 0, -35);
+            ctx.bezierCurveTo(8, -30, 12, -15, 0, 0);
+            ctx.fill();
+            ctx.restore();
         }
-        return this.value;
+
+        // Inner Yellow Center
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#FFF59D';
+        ctx.beginPath();
+        ctx.arc(0, 0, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+}
+
+class PlantStem {
+    constructor() {
+        this.reset();
     }
 
     reset() {
-        this.value = null;
-    }
-}
+        this.baseX = 0;
+        this.baseY = 0;
+        this.tipX = 0;
+        this.tipY = 0;
+        
+        this.vx = 0; // Velocity untuk swaying
+        this.vy = 0;
 
-/**
- * CAMERA MANAGER MODULE
- */
-class CameraManager {
-    constructor(videoElement, onError) {
-        this.video = videoElement;
-        this.onError = onError;
-        this.stream = null;
+        this.opacity = 0;
+        this.targetOpacity = 0;
+
+        // Cabang & Bunga
+        this.flowers = [];
+        this.leaves = [];
+        this.initBotanicalStructure();
     }
 
-    async init() {
-        try {
-            this.stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                    frameRate: { ideal: 60 }
-                },
-                audio: false
-            });
-            this.video.srcObject = this.stream;
-            return new Promise((resolve) => {
-                this.video.onloadedmetadata = () => {
-                    this.video.play();
-                    resolve(true);
-                };
-            });
-        } catch (err) {
-            this.onError("Camera Permission Error", "Unable to access webcam. Please verify device permissions.");
-            return false;
+    initBotanicalStructure() {
+        this.flowers = [];
+        this.leaves = [];
+
+        // 3 Ujung Bunga Utama
+        for (let i = 0; i < 4; i++) {
+            this.flowers.push(new Flower(0, 0));
+        }
+
+        // Daun opsional
+        for (let i = 0; i < 6; i++) {
+            this.leaves.push(new Leaf(0.2 + (i * 0.12), i % 2 === 0 ? 1 : -1));
         }
     }
+
+    update(targetX, targetY, isVisible) {
+        this.targetOpacity = isVisible ? 1 : 0;
+        this.opacity = MathUtils.lerp(this.opacity, this.targetOpacity, 0.08);
+
+        // Inersia & Spring Physics saat tangan bergerak
+        const dx = targetX - this.baseX;
+        const dy = targetY - this.baseY;
+
+        this.baseX = MathUtils.lerp(this.baseX, targetX, 0.2);
+        this.baseY = MathUtils.lerp(this.baseY, targetY, 0.2);
+
+        // Tip Swaying (Efek angin & gerakan elastis)
+        const wind = Math.sin(performance.now() * 0.003) * 12;
+        this.vx = MathUtils.lerp(this.vx, dx * 0.15 + wind, 0.05);
+        this.vy = MathUtils.lerp(this.vy, dy * 0.15, 0.05);
+
+        this.tipX = this.baseX - this.vx;
+        this.tipY = this.baseY - 140 - this.vy;
+
+        // Synchronize Flowers
+        if (this.flowers.length >= 4) {
+            // Main flower
+            this.flowers[0].x = this.tipX;
+            this.flowers[0].y = this.tipY;
+
+            // Side Branches
+            this.flowers[1].x = this.tipX - 40;
+            this.flowers[1].y = this.tipY + 30;
+
+            this.flowers[2].x = this.tipX + 45;
+            this.flowers[2].y = this.tipY + 40;
+
+            this.flowers[3].x = this.tipX - 10;
+            this.flowers[3].y = this.tipY + 70;
+        }
+
+        this.flowers.forEach(f => f.update());
+    }
+
+    toggleBloom(state) {
+        this.flowers.forEach(f => f.setBloom(state));
+    }
+
+    draw(ctx) {
+        if (this.opacity <= 0.01) return;
+
+        ctx.save();
+        ctx.globalAlpha = this.opacity;
+
+        // Batang Utama Organic Smooth Bezier Curve
+        ctx.strokeStyle = '#3a663d';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+
+        const ctrlX = (this.baseX + this.tipX) / 2 + Math.sin(performance.now() * 0.002) * 15;
+        const ctrlY = (this.baseY + this.tipY) / 2;
+
+        ctx.beginPath();
+        ctx.moveTo(this.baseX, this.baseY);
+        ctx.quadraticCurveTo(ctrlX, ctrlY, this.tipX, this.tipY);
+        ctx.stroke();
+
+        // Cabang-cabang Samping
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(ctrlX, ctrlY);
+        ctx.lineTo(this.tipX - 40, this.tipY + 30);
+        ctx.moveTo(ctrlX, ctrlY + 20);
+        ctx.lineTo(this.tipX + 45, this.tipY + 40);
+        ctx.stroke();
+
+        // Daun-daun
+        this.leaves.forEach(leaf => {
+            const lx = MathUtils.lerp(this.baseX, this.tipX, leaf.offsetRatio);
+            const ly = MathUtils.lerp(this.baseY, this.tipY, leaf.offsetRatio);
+            leaf.draw(ctx, lx, ly, Math.atan2(this.tipY - this.baseY, this.tipX - this.baseX));
+        });
+
+        // Bunga-bunga
+        this.flowers.forEach(f => f.draw(ctx));
+
+        ctx.restore();
+    }
 }
 
-/**
- * MATHEMATICAL GESTURE RECOGNIZER
- */
-class GestureRecognizer {
-    static getPalmCenter(landmarks, width, height) {
-        // Average of Wrist (0), Index MCP (5), and Pinky MCP (17)
-        const p0 = landmarks[0];
-        const p5 = landmarks[5];
-        const p17 = landmarks[17];
-
-        const cx = (p0.x + p5.x + p17.x) / 3;
-        const cy = (p0.y + p5.y + p17.y) / 3;
-
-        // Mirror X axis to compensate for flipped video
-        return new Vector2((1 - cx) * width, cy * height);
-    }
-
-    static getPalmRotation(landmarks) {
-        // Vector from Wrist (0) to Middle Finger MCP (9)
-        const p0 = landmarks[0];
-        const p9 = landmarks[9];
-        const dx = (1 - p9.x) - (1 - p0.x);
-        const dy = p9.y - p0.y;
-        return Math.atan2(dy, dx); // Radians
-    }
-
-    static getHandScale(landmarks) {
-        // Distance between Wrist (0) and Middle Finger MCP (9)
-        const p0 = landmarks[0];
-        const p9 = landmarks[9];
-        const dx = p9.x - p0.x;
-        const dy = p9.y - p0.y;
-        const dz = (p9.z || 0) - (p0.z || 0);
-        return Math.sqrt(dx * dx + dy * dy + dz * dz) * 3.5;
-    }
-
+// ==========================================
+// 3. GESTURE RECOGNIZER
+// ==========================================
+class GestureDetector {
+    // Memeriksa Open Palm (Semua jari terbuka relatif terhadap pergelangan tangan/wrist)
     static isOpenPalm(landmarks) {
-        const p0 = landmarks[0];
-        const tips = [8, 12, 16, 20];
-        let totalDist = 0;
+        const wrist = landmarks[0];
+        const tips = [8, 12, 16, 20]; // Index, Middle, Ring, Pinky Tips
+        const mcps = [5, 9, 13, 17];
 
-        tips.forEach(t => {
-            const dx = landmarks[t].x - p0.x;
-            const dy = landmarks[t].y - p0.y;
-            totalDist += Math.sqrt(dx * dx + dy * dy);
+        let extendedCount = 0;
+        tips.forEach((tipIdx, i) => {
+            if (MathUtils.distance(landmarks[tipIdx], wrist) > MathUtils.distance(landmarks[mcps[i]], wrist)) {
+                extendedCount++;
+            }
         });
-
-        const avgDist = totalDist / tips.length;
-        return avgDist > 0.32; // Open palm threshold
+        return extendedCount >= 4;
     }
 
+    // Memeriksa Fist (Mengepal)
     static isFist(landmarks) {
-        const p0 = landmarks[0];
+        const wrist = landmarks[0];
         const tips = [8, 12, 16, 20];
-        let totalDist = 0;
+        const mcps = [5, 9, 13, 17];
 
-        tips.forEach(t => {
-            const dx = landmarks[t].x - p0.x;
-            const dy = landmarks[t].y - p0.y;
-            totalDist += Math.sqrt(dx * dx + dy * dy);
+        let closedCount = 0;
+        tips.forEach((tipIdx, i) => {
+            if (MathUtils.distance(landmarks[tipIdx], wrist) < MathUtils.distance(landmarks[mcps[i]], wrist)) {
+                closedCount++;
+            }
         });
-
-        const avgDist = totalDist / tips.length;
-        return avgDist < 0.20; // Closed fist threshold
+        return closedCount >= 3;
     }
 
+    // Memeriksa Pinch (Ujung Ibu Jari & Telunjuk Berdekatan)
     static isPinch(landmarks) {
         const thumbTip = landmarks[4];
         const indexTip = landmarks[8];
-        const dx = thumbTip.x - indexTip.x;
-        const dy = thumbTip.y - indexTip.y;
-        const dz = (thumbTip.z || 0) - (indexTip.z || 0);
-        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        return dist < 0.06; // Pinch distance threshold
-    }
-
-    static isHandLeft(handedness) {
-        // MediaPipe reports handedness for unmirrored feed
-        return handedness === "Right"; // Mirrored feed swap
-    }
-
-    static isHandRight(handedness) {
-        return handedness === "Left"; // Mirrored feed swap
+        return MathUtils.distance(thumbTip, indexTip) < 0.06;
     }
 }
 
-/**
- * MEDIAPIPE HAND TRACKER
- */
-class HandTracker {
-    constructor(onError) {
-        this.onError = onError;
-        this.landmarker = null;
-        this.filters = {};
+// ==========================================
+// 4. MAIN ENGINE & TRACKER
+// ==========================================
+class InteractiveArtApp {
+    constructor() {
+        this.video = document.getElementById('video');
+        this.canvas = document.getElementById('canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.fpsCounter = document.getElementById('fps-counter');
+
+        this.particles = new ParticleSystem(30);
+        this.plant = new PlantStem();
+
+        // State Logic
+        this.isPlantActive = false;
+        this.isBloomed = false;
+        this.lastPinchState = false;
+
+        // Performance & FPS
+        this.lastTime = performance.now();
+        this.frameCount = 0;
+        this.isProcessingHand = false;
+
+        this.init();
     }
 
     async init() {
-        let retries = 3;
-        while (retries > 0) {
-            try {
-                const vision = await FilesetResolver.forVisionTasks(
-                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
-                );
-                this.landmarker = await HandLandmarker.createFromOptions(vision, {
-                    baseOptions: {
-                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-                        delegate: "GPU"
-                    },
-                    runningMode: "VIDEO",
-                    numHands: 2,
-                    minHandDetectionConfidence: 0.6,
-                    minTrackingConfidence: 0.6
-                });
-                return true;
-            } catch (err) {
-                retries--;
-                if (retries === 0) {
-                    this.onError("MediaPipe Load Failure", "Failed to load hand tracking model after multiple attempts.");
-                    return false;
-                }
-                await new Promise(r => setTimeout(r, 1000));
+        this.initMediaPipe();
+        await this.initWebcam();
+        requestAnimationFrame((time) => this.renderLoop(time));
+    }
+
+    initMediaPipe() {
+        this.hands = new Hands({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+        });
+
+        this.hands.setOptions({
+            maxNumHands: 2,
+            modelComplexity: 1,
+            minDetectionConfidence: 0.65,
+            minTrackingConfidence: 0.65
+        });
+
+        this.hands.onResults((results) => this.onHandResults(results));
+    }
+
+    async initWebcam() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { width: 1280, height: 720, frameRate: { ideal: 60 } },
+                audio: false
+            });
+            this.video.srcObject = stream;
+            await this.video.play();
+        } catch (err) {
+            console.error("Gagal Mengakses Kamera: ", err);
+            this.fpsCounter.innerText = "CAMERA ERROR";
+        }
+    }
+
+    onHandResults(results) {
+        let rightHand = null;
+        let leftHand = null;
+
+        if (results.multiHandLandmarks && results.multiHandedness) {
+            results.multiHandedness.forEach((handedness, idx) => {
+                const label = handedness.label;
+                const landmarks = results.multiHandLandmarks[idx];
+
+                if (label === 'Right') rightHand = landmarks;
+                if (label === 'Left') leftHand = landmarks;
+            });
+        }
+
+        // --- GESTURE 1 & 2: TANGAN KANAN (PLANT CREATION & DISAPPEAR) ---
+        if (rightHand) {
+            const palmCenter = {
+                x: (rightHand[0].x + rightHand[9].x) / 2 * this.canvas.width,
+                y: (rightHand[0].y + rightHand[9].y) / 2 * this.canvas.height
+            };
+
+            if (GestureDetector.isOpenPalm(rightHand)) {
+                this.isPlantActive = true;
+                this.plantTargetPos = palmCenter;
+            } else if (GestureDetector.isFist(rightHand)) {
+                this.isPlantActive = false;
             }
-        }
-    }
 
-    detect(video, timestamp) {
-        if (!this.landmarker || video.readyState < 2) return null;
-        return this.landmarker.detectForVideo(video, timestamp);
-    }
-}
-
-/**
- * PROCEDURAL FLOWER UNIT
- */
-class Flower {
-    constructor(parentSVG, x, y, baseScale = 1.0) {
-        this.parentSVG = parentSVG;
-        this.pos = new Vector2(x, y);
-        this.baseScale = baseScale;
-        
-        this.scale = 0;
-        this.targetScale = 0;
-        this.velocity = 0;
-        this.stiffness = 0.12;
-        this.damping = 0.72;
-
-        this.isOpen = false;
-        this.petalCount = 7;
-        this.element = null;
-        this.initDOM();
-    }
-
-    initDOM() {
-        this.element = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        this.element.setAttribute("class", "flower-group");
-
-        // Generate Petals
-        for (let i = 0; i < this.petalCount; i++) {
-            const angle = (i * 360) / this.petalCount;
-            const petal = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            petal.setAttribute("class", "flower-petal");
-            petal.setAttribute("d", "M 0 0 C -10 -20, -14 -35, 0 -48 C 14 -35, 10 -20, 0 0");
-            petal.setAttribute("transform", `rotate(${angle})`);
-            this.element.appendChild(petal);
-        }
-
-        // Generate Center Pistil
-        const center = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        center.setAttribute("class", "flower-center");
-        center.setAttribute("cx", "0");
-        center.setAttribute("cy", "0");
-        center.setAttribute("r", "6");
-        this.element.appendChild(center);
-
-        this.parentSVG.appendChild(this.element);
-    }
-
-    update(x, y, windAngle) {
-        this.pos.set(x, y);
-
-        // Spring Mechanics for Blooming (Scale 0 -> 1.15 -> 1.0)
-        const force = (this.targetScale - this.scale) * this.stiffness;
-        this.velocity = (this.velocity + force) * this.damping;
-        this.scale += this.velocity;
-
-        const activeScale = Math.max(0, this.scale * this.baseScale);
-        const rotation = windAngle * 15;
-
-        this.element.setAttribute(
-            "transform",
-            `translate(${this.pos.x}, ${this.pos.y}) scale(${activeScale}) rotate(${rotation})`
-        );
-    }
-
-    bloom() {
-        this.targetScale = 1.0;
-        this.isOpen = true;
-        this.element.setAttribute("filter", "url(#bloom-glow)");
-    }
-
-    close() {
-        this.targetScale = 0.15; // Fold inward
-        this.isOpen = false;
-        this.element.removeAttribute("filter");
-    }
-}
-
-/**
- * PROCEDURAL BRANCH & STEM GENERATOR WITH PHYSICS
- */
-class StemGenerator {
-    constructor(svgRoot) {
-        this.svgRoot = svgRoot;
-        this.pos = new Vector2(0, 0);
-        this.smoothedPos = new Vector2(0, 0);
-        this.rotation = 0;
-        this.scale = 1.0;
-        
-        this.opacity = 0;
-        this.targetOpacity = 0;
-        this.growth = 0;
-        this.targetGrowth = 0;
-
-        this.flowers = [];
-        this.windPhase = Math.random() * 100;
-        this.initDOM();
-    }
-
-    initDOM() {
-        this.group = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        
-        this.stemPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        this.stemPath.setAttribute("class", "flora-stem-path");
-        this.stemPath.setAttribute("stroke-width", "8");
-        this.group.appendChild(this.stemPath);
-
-        // Procedural Branches
-        this.branchPaths = [];
-        for (let i = 0; i < 5; i++) {
-            const bp = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            bp.setAttribute("class", "flora-stem-path");
-            bp.setAttribute("stroke-width", `${5 - i * 0.7}`);
-            this.group.appendChild(bp);
-            this.branchPaths.push(bp);
-        }
-
-        this.svgRoot.appendChild(this.group);
-    }
-
-    update(targetPos, targetRot, targetScale, isAlive, time) {
-        // Growth and Fade Out Mechanics
-        if (isAlive) {
-            this.targetGrowth = 1.0;
-            this.targetOpacity = 1.0;
+            if (this.isPlantActive && palmCenter) {
+                this.plant.update(palmCenter.x, palmCenter.y, true);
+            } else {
+                this.plant.update(this.plant.baseX, this.plant.baseY, false);
+            }
         } else {
-            this.targetGrowth = 0.0;
-            this.targetOpacity = 0.0;
+            this.plant.update(this.plant.baseX, this.plant.baseY, false);
         }
 
-        this.growth += (this.targetGrowth - this.growth) * 0.08;
-        this.opacity += (this.targetOpacity - this.opacity) * 0.05; // 300-500ms fade out
+        // --- GESTURE 3 & 4: TANGAN KIRI (PINCH BLOOM TOGGLE) ---
+        if (leftHand) {
+            const isPinching = GestureDetector.isPinch(leftHand);
 
-        if (this.opacity <= 0.01) {
-            this.group.setAttribute("visibility", "hidden");
-            return;
+            // Trigger Toggle hanya saat pinch terjadi pertama kali (Edge Trigger)
+            if (isPinching && !this.lastPinchState) {
+                this.isBloomed = !this.isBloomed;
+                this.plant.toggleBloom(this.isBloomed);
+            }
+            this.lastPinchState = isPinching;
+        } else {
+            this.lastPinchState = false;
         }
 
-        this.group.setAttribute("visibility", "visible");
-        this.group.setAttribute("opacity", this.opacity.toFixed(3));
+        this.isProcessingHand = false;
+    }
 
-        // Smooth Transforms
-        this.smoothedPos.lerp(targetPos, 0.2);
-        this.rotation += (targetRot - this.rotation) * 0.15;
-        this.scale += (targetScale - this.scale) * 0.15;
-
-        // Physics & Wind Sway Calculation
-        const wind = Math.sin(time * 0.003 + this.windPhase) * 0.2;
-        const totalAngle = this.rotation - Math.PI / 2 + wind;
-
-        // Base Trunk Bezier Curves
-        const trunkLen = 180 * this.scale * this.growth;
-        const x0 = this.smoothedPos.x;
-        const y0 = this.smoothedPos.y;
-
-        const ctrlX = x0 + Math.cos(totalAngle + 0.2) * (trunkLen * 0.5);
-        const ctrlY = y0 + Math.sin(totalAngle + 0.2) * (trunkLen * 0.5);
-        const x1 = x0 + Math.cos(totalAngle) * trunkLen;
-        const y1 = y0 + Math.sin(totalAngle) * trunkLen;
-
-        this.stemPath.setAttribute("d", `M ${x0} ${y0} Q ${ctrlX} ${ctrlY}, ${x1} ${y1}`);
-
-        // Generate Procedural Branch Coordinates & Endpoints
-        const branchEndpoints = [];
-        const offsets = [-0.6, 0.5, -0.4, 0.6, -0.2];
-
-        this.branchPaths.forEach((bp, idx) => {
-            const ratio = (idx + 1) / 6;
-            const bx0 = x0 + (x1 - x0) * ratio;
-            const by0 = y0 + (y1 - y0) * ratio;
-
-            const bLen = (90 - idx * 10) * this.scale * this.growth;
-            const bAngle = totalAngle + offsets[idx];
-
-            const bCtrlX = bx0 + Math.cos(bAngle + 0.1) * (bLen * 0.5);
-            const bCtrlY = by0 + Math.sin(bAngle + 0.1) * (bLen * 0.5);
-            const bx1 = bx0 + Math.cos(bAngle) * bLen;
-            const by1 = by0 + Math.sin(bAngle) * bLen;
-
-            bp.setAttribute("d", `M ${bx0} ${by0} Q ${bCtrlX} ${bCtrlY}, ${bx1} ${by1}`);
-            branchEndpoints.push({ x: bx1, y: by1 });
-        });
-
-        // Initialize Flowers on Branch Tips
-        if (this.flowers.length === 0 && this.growth > 0.5) {
-            branchEndpoints.forEach(ep => {
-                this.flowers.push(new Flower(this.group, ep.x, ep.y, 0.7 + Math.random() * 0.4));
-            });
-            // Trunk tip flower
-            this.flowers.push(new Flower(this.group, x1, y1, 1.1));
+    renderLoop(currentTime) {
+        // Dynamic Canvas Resize Synchronization
+        if (this.video.videoWidth && (this.canvas.width !== this.video.videoWidth)) {
+            this.canvas.width = this.video.videoWidth;
+            this.canvas.height = this.video.videoHeight;
         }
 
-        // Update Flowers
-        if (this.flowers.length > 0) {
-            branchEndpoints.forEach((ep, i) => {
-                if (this.flowers[i]) this.flowers[i].update(ep.x, ep.y, wind);
-            });
-            // Trunk tip flower update
-            if (this.flowers[5]) this.flowers[5].update(x1, y1, wind);
+        // Async Hand Tracking Call (Non-blocking FPS)
+        if (this.video.readyState >= 2 && !this.isProcessingHand) {
+            this.isProcessingHand = true;
+            this.hands.send({ image: this.video }).catch(() => { this.isProcessingHand = false; });
         }
-    }
 
-    toggleBloom(forceState) {
-        this.flowers.forEach((flower, idx) => {
-            setTimeout(() => {
-                if (forceState !== undefined) {
-                    forceState ? flower.bloom() : flower.close();
-                } else {
-                    flower.isOpen ? flower.close() : flower.bloom();
-                }
-            }, idx * 60); // Organic staggered blooming sequence
-        });
-    }
-}
-
-/**
- * BACKGROUND PARTICLE SYSTEM
- */
-class BackgroundParticles {
-    constructor(canvas) {
-        this.canvas = canvas;
-        this.ctx = canvas.getContext("2d");
-        this.particles = [];
-        this.resize();
-        this.init();
-
-        window.addEventListener("resize", () => this.resize());
-    }
-
-    resize() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
-    }
-
-    init() {
-        this.particles = [];
-        for (let i = 0; i < 40; i++) {
-            this.particles.push({
-                x: Math.random() * this.canvas.width,
-                y: Math.random() * this.canvas.height,
-                radius: Math.random() * 2 + 1,
-                alpha: Math.random() * 0.5 + 0.1,
-                vx: (Math.random() - 0.5) * 0.3,
-                vy: (Math.random() - 0.5) * 0.3
-            });
-        }
-    }
-
-    render() {
+        // Draw Canvas Elements
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.particles.forEach(p => {
-            p.x += p.vx;
-            p.y += p.vy;
 
-            if (p.x < 0) p.x = this.canvas.width;
-            if (p.x > this.canvas.width) p.x = 0;
-            if (p.y < 0) p.y = this.canvas.height;
-            if (p.y > this.canvas.height) p.y = 0;
+        // Render Background Dust Particles
+        this.particles.updateAndRender(this.ctx, this.canvas.width, this.canvas.height);
 
-            this.ctx.beginPath();
-            this.ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-            this.ctx.fillStyle = `rgba(255, 192, 203, ${p.alpha})`;
-            this.ctx.fill();
-        });
-    }
-}
+        // Render Tanaman Virtual
+        this.plant.draw(this.ctx);
 
-/**
- * MAIN ORCHESTRATOR APPLICATION CLASS
- */
-class App {
-    constructor() {
-        this.video = document.getElementById("webcam");
-        this.svgRoot = document.getElementById("plant-root-group");
-        this.bgCanvas = document.getElementById("bg-canvas");
-
-        // UI Telemetry DOM Elements
-        this.telRightGesture = document.getElementById("tel-right-gesture");
-        this.telLeftGesture = document.getElementById("tel-left-gesture");
-        this.telFloraState = document.getElementById("tel-flora-state");
-        this.telBloomMode = document.getElementById("tel-bloom-mode");
-
-        this.statFps = document.getElementById("stat-fps");
-        this.statLatency = document.getElementById("stat-latency");
-
-        // Debug DOM Elements
-        this.dbgFps = document.getElementById("dbg-fps");
-        this.dbgFrameTime = document.getElementById("dbg-frame-time");
-        this.dbgLatency = document.getElementById("dbg-latency");
-        this.dbgLandmarks = document.getElementById("dbg-landmarks");
-        this.dbgRightConf = document.getElementById("dbg-right-conf");
-        this.dbgLeftConf = document.getElementById("dbg-left-conf");
-        this.dbgPalmRot = document.getElementById("dbg-palm-rot");
-        this.dbgHandScale = document.getElementById("dbg-hand-scale");
-        this.dbgMem = document.getElementById("dbg-mem");
-
-        this.debugPanel = document.getElementById("debug-panel");
-        this.errorModal = document.getElementById("error-dialog");
-
-        // System Controllers
-        this.particles = new BackgroundParticles(this.bgCanvas);
-        this.camera = new CameraManager(this.video, (title, msg) => this.showError(title, msg));
-        this.tracker = new HandTracker((title, msg) => this.showError(title, msg));
-        this.plant = new StemGenerator(this.svgRoot);
-
-        // State Tracking
-        this.pinchCooldown = false;
-        this.isBloomOpen = false;
-        this.frameCount = 0;
-        this.lastFpsTime = performance.now();
-
-        this.initUI();
-        this.start();
-    }
-
-    initUI() {
-        document.getElementById("btn-toggle-debug").addEventListener("click", () => {
-            this.debugPanel.classList.toggle("hidden");
-        });
-
-        document.querySelector(".close-debug").addEventListener("click", () => {
-            this.debugPanel.classList.add("hidden");
-        });
-
-        window.addEventListener("keydown", (e) => {
-            if (e.key === "d" || e.key === "D") {
-                this.debugPanel.classList.toggle("hidden");
-            }
-        });
-
-        document.getElementById("btn-reinit-cam").addEventListener("click", () => {
-            location.reload();
-        });
-
-        document.getElementById("btn-error-retry").addEventListener("click", () => {
-            this.errorModal.classList.add("hidden");
-            this.start();
-        });
-    }
-
-    showError(title, msg) {
-        document.getElementById("error-title").innerText = title;
-        document.getElementById("error-msg").innerText = msg;
-        this.errorModal.classList.remove("hidden");
-    }
-
-    async start() {
-        const camOk = await this.camera.init();
-        if (!camOk) return;
-
-        const trackerOk = await this.tracker.init();
-        if (!trackerOk) return;
-
-        this.loop();
-    }
-
-    loop() {
-        const now = performance.now();
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-
-        // Background Particle Loop
-        this.particles.render();
-
-        // Perform Hand Tracking Inference
-        const results = this.tracker.detect(this.video, now);
-
-        let rightHandFound = false;
-        let leftHandFound = false;
-
-        if (results && results.landmarks && results.landmarks.length > 0) {
-            let totalLandmarks = 0;
-
-            for (let i = 0; i < results.landmarks.length; i++) {
-                const landmarks = results.landmarks[i];
-                totalLandmarks += landmarks.length;
-
-                const handedness = results.handednesses[i][0].categoryName;
-                const score = (results.handednesses[i][0].score * 100).toFixed(0);
-
-                // RIGHT HAND LOGIC (Flora Host)
-                if (GestureRecognizer.isHandRight(handedness)) {
-                    rightHandFound = true;
-                    this.dbgRightConf.innerText = `${score}%`;
-
-                    const palmCenter = GestureRecognizer.getPalmCenter(landmarks, width, height);
-                    const palmRotation = GestureRecognizer.getPalmRotation(landmarks);
-                    const handScale = GestureRecognizer.getHandScale(landmarks);
-
-                    const isOpen = GestureRecognizer.isOpenPalm(landmarks);
-                    const isFist = GestureRecognizer.isFist(landmarks);
-
-                    if (isOpen) {
-                        this.telRightGesture.innerText = "OPEN PALM";
-                        this.telFloraState.innerText = "GROWING";
-                    } else if (isFist) {
-                        this.telRightGesture.innerText = "CLOSED FIST";
-                        this.telFloraState.innerText = "DECAYING";
-                    } else {
-                        this.telRightGesture.innerText = "NEUTRAL";
-                    }
-
-                    // Update Plant Generator
-                    this.plant.update(palmCenter, palmRotation, handScale, isOpen, now);
-
-                    this.dbgPalmRot.innerText = `${(palmRotation * (180 / Math.PI)).toFixed(1)}°`;
-                    this.dbgHandScale.innerText = handScale.toFixed(2);
-                }
-
-                // LEFT HAND LOGIC (Pinch Controller)
-                if (GestureRecognizer.isHandLeft(handedness)) {
-                    leftHandFound = true;
-                    this.dbgLeftConf.innerText = `${score}%`;
-
-                    const isPinching = GestureRecognizer.isPinch(landmarks);
-
-                    if (isPinching) {
-                        this.telLeftGesture.innerText = "PINCH";
-                        if (!this.pinchCooldown) {
-                            this.isBloomOpen = !this.isBloomOpen;
-                            this.plant.toggleBloom(this.isBloomOpen);
-                            this.telBloomMode.innerText = this.isBloomOpen ? "BLOOMING" : "CLOSED";
-
-                            this.pinchCooldown = true;
-                            setTimeout(() => { this.pinchCooldown = false; }, 400); // 400ms Debounce
-                        }
-                    } else {
-                        this.telLeftGesture.innerText = "OPEN";
-                    }
-                }
-            }
-
-            this.dbgLandmarks.innerText = totalLandmarks;
-        } else {
-            // Decay Plant when hands are out of view
-            this.plant.update(this.plant.smoothedPos, this.plant.rotation, this.plant.scale, false, now);
-        }
-
-        if (!rightHandFound) {
-            this.telRightGesture.innerText = "OFFLINE";
-            this.telFloraState.innerText = "DORMANT";
-            this.dbgRightConf.innerText = "0%";
-        }
-
-        if (!leftHandFound) {
-            this.telLeftGesture.innerText = "OFFLINE";
-            this.dbgLeftConf.innerText = "0%";
-        }
-
-        // Performance & Diagnostic Telemetry
+        // FPS Engine Calculation
         this.frameCount++;
-        const frameDuration = performance.now() - now;
-
-        if (now - this.lastFpsTime >= 1000) {
-            const fps = this.frameCount;
-            this.statFps.innerText = fps.toString().padStart(2, "0");
-            this.dbgFps.innerText = fps;
-            this.dbgFrameTime.innerText = `${frameDuration.toFixed(1)} ms`;
-            this.dbgLatency.innerText = `${(frameDuration + 12).toFixed(1)} ms`;
-            this.statLatency.innerText = `${(frameDuration + 12).toFixed(0)}ms`;
-
-            if (performance.memory) {
-                this.dbgMem.innerText = `${(performance.memory.usedJSHeapSize / 1048576).toFixed(1)} MB`;
-            }
-
+        if (currentTime - this.lastTime >= 1000) {
+            this.fpsCounter.innerText = `FPS: ${this.frameCount}`;
             this.frameCount = 0;
-            this.lastFpsTime = now;
+            this.lastTime = currentTime;
         }
 
-        requestAnimationFrame(() => this.loop());
+        requestAnimationFrame((time) => this.renderLoop(time));
     }
 }
 
-// ENTRY POINT
-window.addEventListener("DOMContentLoaded", () => {
-    new App();
+// Launch Application
+window.addEventListener('DOMContentLoaded', () => {
+    new InteractiveArtApp();
 });

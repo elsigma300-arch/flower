@@ -1,346 +1,150 @@
-/* RESET & BASE VARIABLES */
+/* ===== VIRTUAL BOTANICAL ARTWORK STYLES ===== */
 * {
-    box-sizing: border-box;
     margin: 0;
     padding: 0;
-    user-select: none;
-}
-
-:root {
-    --bg-dark: #0d1117;
-    --accent-pink: #FF9ECF;
-    --accent-green: #52b788;
-    --accent-gold: #FBC02D;
-    --text-main: #f0f6fc;
-    --text-muted: #8b949e;
-    --glass-bg: rgba(22, 27, 34, 0.65);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --glass-blur: blur(16px);
+    box-sizing: border-box;
 }
 
 body, html {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background-color: var(--bg-dark);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: var(--text-main);
+    background-color: #0d1117;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #ffffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-/* BACKGROUND CANVAS & PARTICLES */
-#bg-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 1;
-    pointer-events: none;
-}
-
-#app-container {
+/* Master Container */
+.art-container {
     position: relative;
     width: 100vw;
     height: 100vh;
-    z-index: 2;
-    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: radial-gradient(circle at 50% 50%, #1a2332 0%, #0d1117 80%);
 }
 
-/* WEBCAM MIRROR FEED */
-#webcam {
+/* Ambient Background Lights & Vignette */
+.ambient-glow {
+    position: absolute;
+    width: 60vw;
+    height: 60vw;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 182, 213, 0.08) 0%, rgba(0, 0, 0, 0) 70%);
+    pointer-events: none;
+    z-index: 1;
+    animation: floatGlow 10s infinite alternate ease-in-out;
+}
+
+.vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, transparent 40%, rgba(5, 7, 10, 0.85) 100%);
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Camera Wrapper (Centered & Responsive Mirror) */
+.camera-wrapper {
+    position: relative;
+    width: 1280px;
+    max-width: 95vw;
+    height: 720px;
+    max-height: 90vh;
+    aspect-ratio: 16/9;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(255, 158, 207, 0.1);
+    transform: scaleX(-1); /* Mirror Kamera */
+    will-change: transform;
+    z-index: 3;
+}
+
+video {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transform: scaleX(-1);
-    opacity: 0.12;
-    filter: grayscale(100%) contrast(150%);
+    opacity: 0.35; /* Dibuat sedikit transparan agar tanaman terlihat hidup */
+    filter: brightness(0.8) contrast(1.1) blur(1px);
     z-index: 1;
 }
 
-/* SVG INTERACTIVE CANVAS */
-#flora-svg {
+canvas {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
+    object-fit: cover;
+    pointer-events: none;
     z-index: 2;
-    pointer-events: none;
-    will-change: transform;
     transform: translate3d(0,0,0);
+    will-change: transform;
 }
 
-.vignette-overlay {
+/* Glassmorphism Status Overlay */
+.hud-overlay {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.85);
-    z-index: 3;
-    pointer-events: none;
-}
-
-/* UI HEADER */
-#app-header {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 56px;
-    padding: 0 24px;
+    top: 25px;
+    left: 30px;
+    right: 30px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(13, 17, 23, 0.4);
-    backdrop-filter: var(--glass-blur);
-    border-bottom: 1px solid var(--glass-border);
     z-index: 10;
+    pointer-events: none;
 }
 
-.brand {
+.hud-status {
     display: flex;
     align-items: center;
-    gap: 12px;
-}
-
-.brand-icon {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--accent-pink), var(--accent-green));
-    box-shadow: 0 0 10px var(--accent-pink);
-}
-
-.brand-title {
-    font-weight: 700;
-    font-size: 0.95rem;
-    letter-spacing: 1px;
-}
-
-.brand-title small {
-    color: var(--accent-pink);
-    font-size: 0.65rem;
-    margin-left: 6px;
-}
-
-.btn-glass {
+    gap: 10px;
+    padding: 8px 16px;
     background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--glass-border);
-    color: var(--text-main);
-    padding: 8px 14px;
-    border-radius: 6px;
-    font-size: 0.75rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    color: #ffb6d5;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
-.btn-glass:hover {
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
-}
-
-/* SIDEBAR PANELS */
-#app-sidebar {
-    position: absolute;
-    top: 76px;
-    left: 24px;
-    width: 280px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    z-index: 10;
-    pointer-events: none;
-}
-
-.glass-card {
-    pointer-events: auto;
-    background: var(--glass-bg);
-    backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
-    padding: 16px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-}
-
-.glass-card h3 {
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-muted);
-    margin-bottom: 12px;
-}
-
-.gesture-list {
-    list-style: none;
-    font-size: 0.8rem;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.gesture-badge {
-    font-size: 0.65rem;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-weight: bold;
-    margin-right: 4px;
-}
-
-.gesture-badge.right { background: rgba(82, 183, 136, 0.2); color: var(--accent-green); }
-.gesture-badge.left { background: rgba(255, 158, 207, 0.2); color: var(--accent-pink); }
-
-.telemetry-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 8px;
-    font-size: 0.8rem;
-}
-
-.tel-item {
-    display: flex;
-    justify-content: space-between;
-    padding-bottom: 4px;
-    border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
-}
-
-.tel-item strong {
-    color: var(--accent-pink);
-}
-
-/* BOTTOM STATUSBAR */
-#app-statusbar {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 32px;
-    background: rgba(13, 17, 23, 0.8);
-    backdrop-filter: var(--glass-blur);
-    border-top: 1px solid var(--glass-border);
-    display: flex;
-    align-items: center;
-    padding: 0 24px;
-    gap: 24px;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    z-index: 10;
-}
-
-.status-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.indicator {
+.pulse-dot {
     width: 8px;
     height: 8px;
+    background-color: #ff9ecf;
     border-radius: 50%;
+    box-shadow: 0 0 10px #ff9ecf;
+    animation: pulse 2s infinite ease-in-out;
 }
 
-.indicator.green { background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); }
-
-/* DEBUG OVERLAY PANEL */
-#debug-panel {
-    position: absolute;
-    top: 76px;
-    right: 24px;
-    width: 260px;
-    z-index: 20;
+.fps-badge {
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
     font-family: monospace;
-    font-size: 0.75rem;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
 }
 
-.debug-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--glass-border);
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.4); opacity: 0.5; }
 }
 
-.close-debug {
-    cursor: pointer;
-    font-size: 1.2rem;
-    line-height: 1;
-}
-
-.debug-content p {
-    margin: 4px 0;
-    display: flex;
-    justify-content: space-between;
-}
-
-.debug-content span {
-    color: var(--accent-gold);
-}
-
-.hidden {
-    display: none !important;
-}
-
-/* MODAL DIALOG */
-.modal-backdrop {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(8px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 100;
-}
-
-.modal-card {
-    width: 360px;
-    text-align: center;
-}
-
-.modal-card h3 {
-    color: #ff4d4f;
-    margin-bottom: 12px;
-}
-
-.modal-card p {
-    font-size: 0.85rem;
-    margin-bottom: 20px;
-    color: var(--text-muted);
-}
-
-.btn-primary {
-    background: var(--accent-green);
-    border: none;
-    color: #000;
-    padding: 10px 20px;
-    font-weight: bold;
-    border-radius: 6px;
-    cursor: pointer;
-}
-
-/* SVG Dynamic Animation Styling */
-.flora-stem-path {
-    fill: none;
-    stroke: url(#stem-grad);
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    will-change: d, stroke-width;
-}
-
-.flower-petal {
-    fill: url(#petal-grad);
-    stroke: rgba(255, 255, 255, 0.6);
-    stroke-width: 0.5px;
-    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.flower-center {
-    fill: url(#center-grad);
+@keyframes floatGlow {
+    0% { transform: translate(-5%, -5%) scale(1); }
+    100% { transform: translate(5%, 5%) scale(1.1); }
 }
